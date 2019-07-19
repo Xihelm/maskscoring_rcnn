@@ -1,13 +1,12 @@
 # Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved.
 import torch
+from maskrcnn_benchmark.structures.bounding_box import BoxList
 from torch import nn
 
-from maskrcnn_benchmark.structures.bounding_box import BoxList
-
-from .roi_mask_feature_extractors import make_roi_mask_feature_extractor
-from .roi_mask_predictors import make_roi_mask_predictor
 from .inference import make_roi_mask_post_processor
 from .loss import make_roi_mask_loss_evaluator
+from .roi_mask_feature_extractors import make_roi_mask_feature_extractor
+from .roi_mask_predictors import make_roi_mask_predictor
 
 
 def keep_only_positive_boxes(boxes):
@@ -73,13 +72,20 @@ class ROIMaskHead(torch.nn.Module):
             x, roi_feature = self.feature_extractor(features, proposals)
         mask_logits = self.predictor(x)
 
-        if self.cfg.MODEL.MASKIOU_ON: 
+        if self.cfg.MODEL.MASKIOU_ON:
             if not self.training:
                 result = self.post_processor(mask_logits, proposals)
-                return x, result, {}, roi_feature, result[0].get_field("mask"), result[0].get_field("labels"), None
-
-            loss_mask, selected_mask, labels, maskiou_targets = self.loss_evaluator(proposals, mask_logits, targets)
-            return x, all_proposals, dict(loss_mask=loss_mask), roi_feature, selected_mask, labels, maskiou_targets
+                # merge `selected_mask` and `labels` as tensors
+                selected_mask = [r.get_field("mask") for r in result]
+                selected_mask = torch.cat(selected_mask)
+                labels = [r.get_field("labels") for r in result]
+                labels = torch.cat(labels)
+                return x, result, {}, roi_feature, selected_mask, labels, None
+            loss_mask, selected_mask, labels, maskiou_targets = self.loss_evaluator(
+                proposals, mask_logits, targets)
+            return x, all_proposals, dict(
+                loss_mask=loss_mask
+            ), roi_feature, selected_mask, labels, maskiou_targets
         else:
             if not self.training:
                 result = self.post_processor(mask_logits, proposals)
@@ -87,7 +93,6 @@ class ROIMaskHead(torch.nn.Module):
 
             loss_mask = self.loss_evaluator(proposals, mask_logits, targets)
             return x, all_proposals, dict(loss_mask=loss_mask)
-            
 
 
 def build_roi_mask_head(cfg):
