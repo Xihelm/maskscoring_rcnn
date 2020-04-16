@@ -5,7 +5,6 @@ import sys
 from maskrcnn_benchmark.utils.comm import is_main_process, synchronize
 
 try:
-    torch.hub.download_url_to_file
     from torch.hub import download_url_to_file
     from torch.hub import urlparse
     from torch.hub import HASH_REGEX
