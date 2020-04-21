@@ -1,7 +1,6 @@
 # Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved.
-import torch
-
 import pycocotools.mask as mask_utils
+import torch
 
 # transpose
 FLIP_LEFT_RIGHT = 0
@@ -14,7 +13,6 @@ class Mask(object):
     It is supposed to contain the mask for an object as
     a 2d tensor
     """
-
     def __init__(self, masks, size, mode):
         self.masks = masks
         self.size = size
@@ -23,8 +21,7 @@ class Mask(object):
     def transpose(self, method):
         if method not in (FLIP_LEFT_RIGHT, FLIP_TOP_BOTTOM):
             raise NotImplementedError(
-                "Only FLIP_LEFT_RIGHT and FLIP_TOP_BOTTOM implemented"
-            )
+                "Only FLIP_LEFT_RIGHT and FLIP_TOP_BOTTOM implemented")
 
         width, height = self.size
         if method == FLIP_LEFT_RIGHT:
@@ -41,7 +38,7 @@ class Mask(object):
     def crop(self, box):
         w, h = box[2] - box[0], box[3] - box[1]
 
-        cropped_masks = self.masks[:, box[1] : box[3], box[0] : box[2]]
+        cropped_masks = self.masks[:, box[1]:box[3], box[0]:box[2]]
         return Mask(cropped_masks, size=(w, h), mode=self.mode)
 
     def resize(self, size, *args, **kwargs):
@@ -54,11 +51,12 @@ class Polygons(object):
     of an object mask. The object can be represented as a set of
     polygons
     """
-
     def __init__(self, polygons, size, mode):
         # assert isinstance(polygons, list), '{}'.format(polygons)
         if isinstance(polygons, list):
-            polygons = [torch.as_tensor(p, dtype=torch.float32) for p in polygons]
+            polygons = [
+                torch.as_tensor(p, dtype=torch.float32) for p in polygons
+            ]
         elif isinstance(polygons, Polygons):
             polygons = polygons.polygons
 
@@ -69,8 +67,7 @@ class Polygons(object):
     def transpose(self, method):
         if method not in (FLIP_LEFT_RIGHT, FLIP_TOP_BOTTOM):
             raise NotImplementedError(
-                "Only FLIP_LEFT_RIGHT and FLIP_TOP_BOTTOM implemented"
-            )
+                "Only FLIP_LEFT_RIGHT and FLIP_TOP_BOTTOM implemented")
 
         flipped_polygons = []
         width, height = self.size
@@ -106,7 +103,8 @@ class Polygons(object):
         return Polygons(cropped_polygons, size=(w, h), mode=self.mode)
 
     def resize(self, size, *args, **kwargs):
-        ratios = tuple(float(s) / float(s_orig) for s, s_orig in zip(size, self.size))
+        ratios = tuple(
+            float(s) / float(s_orig) for s, s_orig in zip(size, self.size))
         if ratios[0] == ratios[1]:
             ratio = ratios[0]
             scaled_polys = [p * ratio for p in self.polygons]
@@ -126,8 +124,7 @@ class Polygons(object):
         width, height = self.size
         if mode == "mask":
             rles = mask_utils.frPyObjects(
-                [p.numpy() for p in self.polygons], height, width
-            )
+                [p.numpy() for p in self.polygons], height, width)
             rle = mask_utils.merge(rles)
             mask = mask_utils.decode(rle)
             mask = torch.from_numpy(mask)
@@ -147,7 +144,6 @@ class SegmentationMask(object):
     """
     This class stores the segmentations for all objects in the image
     """
-
     def __init__(self, polygons, size, mode=None):
         """
         Arguments:
@@ -165,8 +161,7 @@ class SegmentationMask(object):
     def transpose(self, method):
         if method not in (FLIP_LEFT_RIGHT, FLIP_TOP_BOTTOM):
             raise NotImplementedError(
-                "Only FLIP_LEFT_RIGHT and FLIP_TOP_BOTTOM implemented"
-            )
+                "Only FLIP_LEFT_RIGHT and FLIP_TOP_BOTTOM implemented")
 
         flipped = []
         for polygon in self.polygons:
@@ -195,13 +190,14 @@ class SegmentationMask(object):
         else:
             # advanced indexing on a single dimension
             selected_polygons = []
-            if isinstance(item, torch.Tensor) and item.dtype == torch.uint8:
+            if isinstance(item, torch.Tensor) and item.dtype == torch.bool:
                 item = item.nonzero()
                 item = item.squeeze(1) if item.numel() > 0 else item
                 item = item.tolist()
             for i in item:
                 selected_polygons.append(self.polygons[i])
-        return SegmentationMask(selected_polygons, size=self.size, mode=self.mode)
+        return SegmentationMask(
+            selected_polygons, size=self.size, mode=self.mode)
 
     def __iter__(self):
         return iter(self.polygons)
